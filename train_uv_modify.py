@@ -1,5 +1,5 @@
 """
-2维RANS_niut
+2维NS
 """
 import numpy as np
 import torch.optim.lr_scheduler
@@ -16,16 +16,16 @@ if device.type == 'cpu':
 
 # 训练代码主体
 # 重要可调超参数
-filename_data = './2d_cylinder_Re3900_100x100.mat'  # 训练数据
+filename_data = './2d_cylinder_Re3900_100x100_kw_sst.mat'  # 训练数据
 N_eqa = 1000000  # 方程点数目
-layer_mat_uv = [3, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 4]  # 网络结构
-layer_mat_psi = [3, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 3]  # 网络结构
+layer_mat_uv = [3, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 3]  # 网络结构
+layer_mat_psi = [3, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 2]  # 网络结构
 layer_mat = layer_mat_psi
 learning_rate = 0.001  # 学习率
 epochs = 3000  # 训练周期数
 ratio = 0.005  # 用以控制batch size
 decay_rate = 0.9  # 用以控制最大学习率
-debug_key = 1
+debug_key = 0
 ###
 if __name__ == "__main__":
     start_time = time.time()
@@ -44,6 +44,7 @@ if __name__ == "__main__":
     pinn_net = pinn_net.to(device)
     # 用以记录各部分损失的列表
     losses = np.empty((0, 3), dtype=float)
+
     if os.path.exists(filename_save_model):
         pinn_net.load_state_dict(torch.load(filename_load_model, map_location=device))
     if os.path.exists(filename_loss):
