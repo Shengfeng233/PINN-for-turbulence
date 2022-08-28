@@ -10,13 +10,18 @@ The test case for this repository is the wake of a 2d flow past a circular cylin
 # Note
 1. All the data in the wake region is used in this repository. However, if you try different sparsity, you will find it is still trainable.
 
-2. The learning rate schedule adopted in this repository is Cosine Annealing Warm Restart With Decay.
+2. The learning rate schedule adopted in this repository is Cosine Annealing Warm Restart With Decay(see reference4).
 
-3. Further approaches for solving turbulent flow are under study
+3. Both the data and the equations are non-dimensional. 
 
-4. The annotates are in Chinese
+4. Further approaches for solving turbulent flow are under study.
+
+5. The annotates are in Chinese.
+
+6. The code is still being optimized, it would be appreciated to contact me (xu_shengfeng1220@163.com) if you find any unreasonably written code.
 
 # Reference
 1. Raissi M, Perdikaris P, Karniadakis G E. Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations[J]. Journal of Computational physics, 2019, 378: 686-707.
 2. Xu H, Zhang W, Wang Y. Explore missing flow dynamics by physics-informed deep learning: The parameterized governing systems[J]. Physics of Fluids, 2021, 33(9): 095116.
 3. Eivazi H, Tahani M, Schlatter P, et al. Physics-informed neural networks for solving Reynolds-averaged Navier–Stokes equations[J]. Physics of Fluids, 2022, 34(7): 075117.
+4. https://github.com/saadnaeem-dev/pytorch-linear-warmup-cosine-annealing-warm-restarts-weight-decay
