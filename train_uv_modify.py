@@ -1,5 +1,5 @@
 """
-2维NS
+2维RANS_stress
 """
 import numpy as np
 import torch.optim.lr_scheduler
@@ -16,10 +16,10 @@ if device.type == 'cpu':
 
 # 训练代码主体
 # 重要可调超参数
-filename_data = './2d_cylinder_Re3900_100x100_kw_sst.mat'  # 训练数据
+filename_data = './2d_cylinder_Re3900_100x100.mat'  # 训练数据
 N_eqa = 1000000  # 方程点数目
-layer_mat_uv = [3, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 3]  # 网络结构
-layer_mat_psi = [3, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 2]  # 网络结构
+layer_mat_uv = [3, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 6]  # 网络结构
+layer_mat_psi = [3, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 5]  # 网络结构
 layer_mat = layer_mat_psi
 learning_rate = 0.001  # 学习率
 epochs = 3000  # 训练周期数
