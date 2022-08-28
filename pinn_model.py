@@ -1,5 +1,5 @@
 """
-PINN融合不可压缩NS方程
+PINN融合不可压缩RANS_Niut方程
 二维流动
 PINN模型 + LOSS函数
 """
@@ -14,7 +14,7 @@ from read_data import *
 # 全局参数
 filename_load_model = './NS_model_train.pt'
 filename_save_model = './NS_model_train.pt'
-filename_data = './2d_cylinder_Re3900_100x100_kw_sst.mat'
+filename_data = './2d_cylinder_Re3900_100x100.mat'
 filename_loss = './loss.csv'
 # 训练设备为GPU还是CPU
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -69,50 +69,7 @@ class PINN_Net(nn.Module):
         mse_predict = mse(u_predict, u) + mse(v_predict, v)
         return mse_predict
 
-    # 类内方法：求数据点的loss-流函数
-    def data_mse_psi(self, x, y, t, u, v, p):
-        predict_out = self.forward(x, y, t)
-        psi = predict_out[:, 0].reshape(-1, 1)
-        u_predict = torch.autograd.grad(psi.sum(), y, create_graph=True)[0]
-        v_predict = -torch.autograd.grad(psi.sum(), x, create_graph=True)[0]
-        p_predict = predict_out[:, 1].reshape(-1, 1)
-        mse = torch.nn.MSELoss()
-        mse_predict = mse(u_predict, u) + mse(v_predict, v) + mse(p_predict, p)
-        return mse_predict
-
-    # 类内方法：求方程点的loss-无量纲方程-流函数
-    def equation_mse_dimensionless_psi(self, x, y, t, Re):
-        # 正问题
-        predict_out = self.forward(x, y, t)
-        # 获得预测的输出psi,p
-        psi = predict_out[:, 0].reshape(-1, 1)
-        p = predict_out[:, 1].reshape(-1, 1)
-        # 通过自动微分计算各个偏导数,其中.sum()将矢量转化为标量，并无实际意义
-        u = torch.autograd.grad(psi.sum(), y, create_graph=True)[0]
-        v = -torch.autograd.grad(psi.sum(), x, create_graph=True)[0]
-        # 一阶导
-        u_t = torch.autograd.grad(u.sum(), t, create_graph=True)[0]
-        u_x = torch.autograd.grad(u.sum(), x, create_graph=True)[0]
-        u_y = torch.autograd.grad(u.sum(), y, create_graph=True)[0]
-        v_t = torch.autograd.grad(v.sum(), t, create_graph=True)[0]
-        v_x = torch.autograd.grad(v.sum(), x, create_graph=True)[0]
-        v_y = torch.autograd.grad(v.sum(), y, create_graph=True)[0]
-        p_x = torch.autograd.grad(p.sum(), x, create_graph=True)[0]
-        p_y = torch.autograd.grad(p.sum(), y, create_graph=True)[0]
-        # 二阶导
-        u_xx = torch.autograd.grad(u_x.sum(), x, create_graph=True)[0]
-        u_yy = torch.autograd.grad(u_y.sum(), y, create_graph=True)[0]
-        v_xx = torch.autograd.grad(v_x.sum(), x, create_graph=True)[0]
-        v_yy = torch.autograd.grad(v_y.sum(), y, create_graph=True)[0]
-        # 计算偏微分方程的残差
-        f_equation_x = u_t + (u * u_x + v * u_y) + p_x - 1.0 / Re * (u_xx + u_yy)
-        f_equation_y = v_t + (u * v_x + v * v_y) + p_y - 1.0 / Re * (v_xx + v_yy)
-        mse = torch.nn.MSELoss()
-        batch_t_zeros = torch.from_numpy(np.zeros((x.shape[0], 1))).float().requires_grad_(True).to(device)
-        mse_equation = mse(f_equation_x, batch_t_zeros) + mse(f_equation_y, batch_t_zeros)
-
-        return mse_equation
-
+    # 类内方法：求方程点的loss-无量纲方程
     def equation_mse_dimensionless(self, x, y, t, Re):
         # 正问题
         predict_out = self.forward(x, y, t)
@@ -120,6 +77,7 @@ class PINN_Net(nn.Module):
         u = predict_out[:, 0].reshape(-1, 1)
         v = predict_out[:, 1].reshape(-1, 1)
         p = predict_out[:, 2].reshape(-1, 1)
+        niu_t = predict_out[:, 3].reshape(-1, 1)
         # 通过自动微分计算各个偏导数,其中.sum()将矢量转化为标量，并无实际意义
         # 一阶导
         u_t = torch.autograd.grad(u.sum(), t, create_graph=True)[0]
@@ -137,12 +95,57 @@ class PINN_Net(nn.Module):
         v_yy = torch.autograd.grad(v_y.sum(), y, create_graph=True)[0]
         # 计算偏微分方程的残差
         f_equation_mass = u_x + u_y
-        f_equation_x = u_t + (u * u_x + v * u_y) + p_x - 1.0 / Re * (u_xx + u_yy)
-        f_equation_y = v_t + (u * v_x + v * v_y) + p_y - 1.0 / Re * (v_xx + v_yy)
+        f_equation_x = u_t + (u * u_x + v * u_y) + p_x - 1.0/Re * (1+niu_t) * (u_xx + u_yy)
+        f_equation_y = v_t + (u * v_x + v * v_y) + p_y - 1.0/Re * (1+niu_t) * (v_xx + v_yy)
         mse = torch.nn.MSELoss()
         batch_t_zeros = torch.from_numpy(np.zeros((x.shape[0], 1))).float().requires_grad_(True).to(device)
         mse_equation = mse(f_equation_x, batch_t_zeros) + mse(f_equation_y, batch_t_zeros) + \
                        mse(f_equation_mass, batch_t_zeros)
+
+        return mse_equation
+
+    # 类内方法：求数据点的loss-流函数法
+    def data_mse_psi(self, x, y, t, u, v, p):
+        predict_out = self.forward(x, y, t)
+        psi = predict_out[:, 0].reshape(-1, 1)
+        u_predict = torch.autograd.grad(psi.sum(), y, create_graph=True)[0]
+        v_predict = -torch.autograd.grad(psi.sum(), x, create_graph=True)[0]
+        p_predict = predict_out[:, 1].reshape(-1, 1)
+        mse = torch.nn.MSELoss()
+        mse_predict = mse(u_predict, u) + mse(v_predict, v) + mse(p_predict, p)
+        return mse_predict
+
+    # 类内方法：求方程点的loss-无量纲方程-流函数法
+    def equation_mse_dimensionless_psi(self, x, y, t, Re):
+        # 正问题
+        predict_out = self.forward(x, y, t)
+        # 获得预测的输出u,v,w,p,k,epsilon
+        psi = predict_out[:, 0].reshape(-1, 1)
+        p = predict_out[:, 1].reshape(-1, 1)
+        u = torch.autograd.grad(psi.sum(), y, create_graph=True)[0]
+        v = -torch.autograd.grad(psi.sum(), x, create_graph=True)[0]
+        niu_t = predict_out[:, 2].reshape(-1, 1)
+        # 通过自动微分计算各个偏导数,其中.sum()将矢量转化为标量，并无实际意义
+        # 一阶导
+        u_t = torch.autograd.grad(u.sum(), t, create_graph=True)[0]
+        u_x = torch.autograd.grad(u.sum(), x, create_graph=True)[0]
+        u_y = torch.autograd.grad(u.sum(), y, create_graph=True)[0]
+        v_t = torch.autograd.grad(v.sum(), t, create_graph=True)[0]
+        v_x = torch.autograd.grad(v.sum(), x, create_graph=True)[0]
+        v_y = torch.autograd.grad(v.sum(), y, create_graph=True)[0]
+        p_x = torch.autograd.grad(p.sum(), x, create_graph=True)[0]
+        p_y = torch.autograd.grad(p.sum(), y, create_graph=True)[0]
+        # 二阶导
+        u_xx = torch.autograd.grad(u_x.sum(), x, create_graph=True)[0]
+        u_yy = torch.autograd.grad(u_y.sum(), y, create_graph=True)[0]
+        v_xx = torch.autograd.grad(v_x.sum(), x, create_graph=True)[0]
+        v_yy = torch.autograd.grad(v_y.sum(), y, create_graph=True)[0]
+        # 计算偏微分方程的残差
+        f_equation_x = u_t + (u * u_x + v * u_y) + p_x - 1.0/Re * (1+niu_t) * (u_xx + u_yy)
+        f_equation_y = v_t + (u * v_x + v * v_y) + p_y - 1.0/Re * (1+niu_t) * (v_xx + v_yy)
+        mse = torch.nn.MSELoss()
+        batch_t_zeros = torch.from_numpy(np.zeros((x.shape[0], 1))).float().requires_grad_(True).to(device)
+        mse_equation = mse(f_equation_x, batch_t_zeros) + mse(f_equation_y, batch_t_zeros)
 
         return mse_equation
 
