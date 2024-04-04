@@ -94,7 +94,7 @@ class PINN_Net(nn.Module):
         v_xx = torch.autograd.grad(v_x.sum(), x, create_graph=True)[0]
         v_yy = torch.autograd.grad(v_y.sum(), y, create_graph=True)[0]
         # 计算偏微分方程的残差
-        f_equation_mass = u_x + u_y
+        f_equation_mass = u_x + v_y
         f_equation_x = u_t + (u * u_x + v * u_y) + p_x - 1.0/Re * (1+niu_t) * (u_xx + u_yy)
         f_equation_y = v_t + (u * v_x + v * v_y) + p_y - 1.0/Re * (1+niu_t) * (v_xx + v_yy)
         mse = torch.nn.MSELoss()
