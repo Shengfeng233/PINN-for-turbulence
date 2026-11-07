@@ -46,7 +46,7 @@ if __name__ == "__main__":
     losses = np.empty((0, 3), dtype=float)
 
     if os.path.exists(filename_save_model):
-        pinn_net.load_state_dict(torch.load(filename_load_model, map_location=device))
+        pinn_net.load_state_dict(torch.load(filename_load_model, map_location=device, weights_only=True))
     if os.path.exists(filename_loss):
         loss_read = pd.read_csv('loss.csv', header=None)
         losses = loss_read.values
